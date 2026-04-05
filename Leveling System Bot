@@ -1,0 +1,116 @@
+const { Client, GatewayIntentBits } = require('discord.js');
+const fs = require('fs');
+
+const client = new Client({
+intents: [
+GatewayIntentBits.Guilds,
+GatewayIntentBits.GuildMessages,
+GatewayIntentBits.MessageContent
+]
+});
+
+const TOKEN = "YOUR_BOT_TOKEN";
+
+// Load data
+let levels = {};
+if (fs.existsSync('./levels.json')) {
+levels = JSON.parse(fs.readFileSync('./levels.json'));
+}
+
+// Cooldown map
+const cooldown = new Map();
+
+// XP needed formula
+function xpNeeded(level) {
+return 5 * (level ** 2) + 50 * level + 100;
+}
+
+client.on("ready", () => {
+console.log(`Level system ready as ${client.user.tag}`);
+});
+
+client.on("messageCreate", (message) => {
+if (message.author.bot) return;
+
+const userId = message.author.id;
+
+// cooldown (5 seconds)
+if (cooldown.has(userId)) {
+const timeLeft = cooldown.get(userId) - Date.now();
+if (timeLeft > 0) return;
+}
+
+cooldown.set(userId, Date.now() + 5000);
+
+// create user if not exist
+if (!levels[userId]) {
+levels[userId] = {
+xp: 0,
+level: 0
+};
+}
+
+// add XP
+const xpGain = Math.floor(Math.random() * 10) + 5;
+levels[userId].xp += xpGain;
+
+const needed = xpNeeded(levels[userId].level);
+
+// level up
+if (levels[userId].xp >= needed) {
+levels[userId].level++;
+levels[userId].xp = 0;
+
+```
+message.channel.send(`🎉 ${message.author} leveled up to **Level ${levels[userId].level}**!`);
+```
+
+}
+
+// save file
+fs.writeFileSync('./levels.json', JSON.stringify(levels, null, 2));
+});
+
+// COMMANDS
+client.on("messageCreate", (message) => {
+if (message.author.bot) return;
+
+const args = message.content.split(" ");
+const cmd = args[0];
+
+// CHECK LEVEL
+if (cmd === "!level") {
+const user = message.mentions.users.first() || message.author;
+
+```
+if (!levels[user.id]) {
+  return message.reply("No data yet.");
+}
+
+message.reply(`📊 ${user.username}
+```
+
+Level: ${levels[user.id].level}
+XP: ${levels[user.id].xp}`);
+}
+
+// LEADERBOARD
+if (cmd === "!leaderboard") {
+const sorted = Object.entries(levels)
+.sort((a, b) => b[1].level - a[1].level)
+.slice(0, 5);
+
+```
+let text = "🏆 Leaderboard:\n";
+
+sorted.forEach((user, i) => {
+  text += `${i + 1}. <@${user[0]}> - Level ${user[1].level}\n`;
+});
+
+message.channel.send(text);
+```
+
+}
+});
+
+client.login(TOKEN);
